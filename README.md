@@ -62,7 +62,7 @@ flowchart LR
 | Ruta | Contenido |
 |---|---|
 | `.github/workflows/ci.yml` | Pipeline de CI: jobs `pruebas`, `calidad` y `seguridad` |
-| `Jenkinsfile` | Pipeline de CD: 8 stages con su justificación en comentarios |
+| `Jenkinsfile` | Pipeline de CD: 8 stages (justificación en `docs/DOCUMENTACION.md` §4) |
 | `jenkins/` | Imagen y configuración como código para correr el `Jenkinsfile` en local ([instrucciones](jenkins/README.md)) |
 | `backend/`, `frontend/` | Código y `Dockerfile` de cada capa |
 | `k8s/` | Namespace, Deployments y Services; `k8s/monitoring/` con Prometheus y Grafana |

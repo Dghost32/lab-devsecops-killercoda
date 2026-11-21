@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 4 — Carga las imágenes en el cluster y despliega frontend + backend.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

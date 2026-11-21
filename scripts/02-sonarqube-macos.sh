@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 2 (macOS) — Levanta SonarQube Community, crea un token y analiza el backend.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,7 +22,6 @@ done
 echo " ${STATUS:-desconocido}"
 [ "$STATUS" = "UP" ] || { echo "SonarQube no arrancó; revisa: docker logs sonarqube"; exit 1; }
 
-# Cambia la contraseña por defecto (admin/admin) la primera vez
 curl -s -o /dev/null -u admin:admin -X POST \
   "${SONAR_URL}/api/users/change_password?login=admin&previousPassword=admin&password=${NEW_PASS}" || true
 

@@ -1,14 +1,11 @@
-# Secretos locales (el token de SonarQube nunca va al repositorio)
 .sonar-token
 .env
 *.env
 
-# Dependencias y artefactos generados
 node_modules/
 reportes/
 trivy-*.txt
 trivy-*.sarif
 
-# Sistema operativo y herramientas locales
 .DS_Store
 .remember/

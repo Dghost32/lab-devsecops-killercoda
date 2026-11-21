@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Comprueba el estado de cada pieza del laboratorio.
 cd "$(dirname "$0")/.."
 ok()   { echo "  [OK]  $1"; }
 fail() { echo "  [--]  $1"; }

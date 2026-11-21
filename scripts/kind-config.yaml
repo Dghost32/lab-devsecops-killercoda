@@ -1,14 +1,12 @@
-# Cluster de un nodo con los NodePort publicados en la máquina anfitriona,
-# para que Killercoda (Traffic / Ports) pueda abrirlos en el navegador.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: lab
 nodes:
   - role: control-plane
     extraPortMappings:
-      - containerPort: 30080   # frontend
+      - containerPort: 30080
         hostPort: 30080
-      - containerPort: 30090   # prometheus
+      - containerPort: 30090
         hostPort: 30090
-      - containerPort: 30300   # grafana
+      - containerPort: 30300
         hostPort: 30300

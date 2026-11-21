@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 0 — Instala kind, kubectl y Trivy, y prepara el kernel para SonarQube.
 set -euo pipefail
 
 KIND_VERSION="v0.24.0"

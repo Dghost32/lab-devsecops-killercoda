@@ -85,7 +85,7 @@ flowchart LR
 
 ## 4. CD con Jenkins
 
-Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). Cada stage tiene un comentario en el archivo que justifica su existencia y su posición.
+Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). La justificación de cada stage y de su posición está en la tabla siguiente, no en comentarios del código.
 
 | # | Stage | Qué hace | Por qué ahí |
 |---|---|---|---|
@@ -151,7 +151,7 @@ El commit `bf5b129` del repositorio original cambió el `ci.yml` a `secrets.SONA
 
 - **Síntoma** al desplegar en kind: `container has runAsNonRoot and image has non-numeric user (node), cannot verify user is non-root`.
 - **Causa:** el Deployment exige `runAsNonRoot: true`, pero el Dockerfile declara `USER node`, un **nombre** y no un UID. El kubelet no puede resolver nombres dentro de la imagen, así que no puede verificar que no sea root y se niega a arrancar el contenedor.
-- **Corrección:** `runAsUser: 1000` (UID de `node` en la imagen oficial) en el `securityContext` de [`k8s/10-backend.yaml`](../k8s/10-backend.yaml). La alternativa equivalente es `USER 1000` en el Dockerfile.
+- **Corrección:** `runAsUser: 1000` (UID de `node` en la imagen oficial) en el `securityContext` de [`k8s/10-backend.yaml`](../k8s/10-backend.yaml), y `USER 1000` en lugar de `USER node` en el [`backend/Dockerfile`](../backend/Dockerfile), para que la imagen sea verificable por sí sola en cualquier clúster.
 - **Lección:** un control de seguridad correcto (no correr como root) rompe el despliegue si la imagen y el manifiesto no están alineados. Validar los manifiestos contra la imagen antes de desplegar (*shift left*) lo habría detectado antes.
 
 ### 6.4 Problemas resueltos al montar Jenkins
@@ -244,6 +244,9 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 - **Configuración de Kubernetes:** Trivy reporta 10 hallazgos HIGH en los manifiestos (`readOnlyRootFilesystem` sin definir y `securityContext` por defecto en frontend y monitoreo). Corregirlos requiere montar `emptyDir` en las rutas que escriben Nginx y Prometheus.
 - **Hallazgos abiertos de SonarQube Cloud:** credencial de Grafana quemada en el manifiesto, *service accounts* montados sin necesidad, `curl` sin `--proto '=https'` y *code smells* de estilo en los scripts (detalle en la [sección 6.5](#65-hallazgos-de-sonarqube-cloud)).
 - **Node.js 20 llegó a fin de vida (abril 2026).** La imagen pasa el escaneo hoy, pero el siguiente paso es migrar a Node 22 o 24 LTS.
+- **Build multi-stage del backend:** hoy la imagen borra npm, npx, yarn y corepack después de instalar (sección 6.1). Lo de fondo es instalar las dependencias en una etapa de build y ejecutar en una imagen sin gestor de paquetes (por ejemplo distroless `nodejs`), para que el borrado no haga falta.
+- **Builds en el nodo controlador de Jenkins:** el pipeline corre en el *built-in node*, algo aceptable solo en un laboratorio local. En producción el controlador queda con 0 ejecutores y los builds corren en agentes o pods efímeros, para que un build no pueda leer la configuración ni las credenciales del controlador.
+- **Jenkins sobre Java 21:** Jenkins deja de soportarlo a partir del 30 de septiembre de 2027; la imagen base pasaría a `jenkins/jenkins:lts-jdk25`.
 - **Cobertura de pruebas en SonarQube es 0 %:** falta generar el reporte LCOV (`node --test --experimental-test-coverage`) y pasarlo con `sonar.javascript.lcov.reportPaths`.
 - **El stage de despliegue no se ejecutó desde Jenkins:** el contenedor de Jenkins no tiene `kubectl` ni acceso al clúster de kind. El despliegue sí se validó manualmente con `scripts/04-desplegar.sh`. La guía califica la definición de los stages, no su ejecución.
 - **PR desde forks sin análisis de SonarQube:** consecuencia de usar OIDC. Se analiza al hacer merge a `main`. Si el proyecto recibiera muchas contribuciones externas, se usaría un flujo `workflow_run` separado.

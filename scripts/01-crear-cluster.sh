@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 1 — Crea un cluster Kubernetes de un nodo con kind.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

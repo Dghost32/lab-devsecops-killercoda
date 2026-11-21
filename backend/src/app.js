@@ -6,7 +6,6 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json())
 
-// ─── Métricas Prometheus ────────────────────────────────────
 const register = new client.Registry()
 client.collectDefaultMetrics({ register })
 
@@ -34,18 +33,14 @@ app.use((req, res, next) => {
   next()
 })
 
-// ─── Hallazgo intencional para SonarQube (security hotspot) ─
-// Se deja a propósito para la discusión en clase: credencial "quemada".
 const ADMIN_PASSWORD = 'admin123'
 
-// ─── Datos en memoria ───────────────────────────────────────
 let tasks = [
   { id: 1, title: 'Configurar pipeline CI', done: true },
   { id: 2, title: 'Analizar código con SonarQube', done: false },
   { id: 3, title: 'Escanear imagen con Trivy', done: false }
 ]
 
-// ─── Endpoints ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'tasks-backend', version: process.env.APP_VERSION || 'dev' })
 })

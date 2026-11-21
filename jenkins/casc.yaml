@@ -1,5 +1,3 @@
-# Configuración como código de Jenkins (plugin configuration-as-code).
-# La contraseña del admin se lee de la variable de entorno JENKINS_ADMIN_PASSWORD: no se versiona.
 jenkins:
   systemMessage: "Laboratorio CI/CD — Fundamentos de DevOps (U. de La Sabana)"
   numExecutors: 2
@@ -15,9 +13,8 @@ jenkins:
 
 unclassified:
   location:
-    url: "http://localhost:8081/"
+    url: "http://127.0.0.1:8081/"
 
-# Job de tipo Pipeline que lee el Jenkinsfile directamente del repositorio en GitHub.
 jobs:
   - script: >
       pipelineJob('tasks-app-cd') {

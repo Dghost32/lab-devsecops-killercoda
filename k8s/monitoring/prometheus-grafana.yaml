@@ -1,5 +1,3 @@
-# Monitoreo liviano para el playground (Prometheus + Grafana sin Helm).
-# Prometheus descubre los pods anotados con prometheus.io/scrape=true.
 apiVersion: v1
 kind: Namespace
 metadata:

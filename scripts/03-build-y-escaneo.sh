@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 3 — Pruebas, construcción de imágenes y escaneo de seguridad con Trivy.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p reportes

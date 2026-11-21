@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Paso 5 (opcional) — Prometheus + Grafana dentro del cluster y tráfico de prueba.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

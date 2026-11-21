@@ -26,7 +26,7 @@ docker run -d --name jenkins-lab \
 
 - **`-v /var/run/docker.sock`**: el Docker CLI del contenedor usa el daemon del host (Docker-outside-of-Docker). Las imágenes que construye el pipeline quedan en el Docker del host.
 - **`--group-add 0`**: en Docker Desktop el socket pertenece a `root:root` con permisos `660`. Agregar el grupo 0 al usuario `jenkins` le da acceso sin correr Jenkins como root.
-- **`127.0.0.1:8081`**: Jenkins solo es accesible desde el propio equipo.
+- **`127.0.0.1:8081`**: Jenkins solo es accesible desde el propio equipo. Se entra por http://127.0.0.1:8081, la misma URL configurada en `casc.yaml`; si se usa `localhost`, Jenkins avisa de un *reverse proxy* roto y las cookies de otras apps en `localhost` pueden provocar un error 431.
 
 > Montar el socket de Docker le da al contenedor control total del daemon del host. Sirve para un laboratorio local; en producción se usan agentes efímeros (Kubernetes, Docker Cloud) o builders sin daemon (Kaniko, BuildKit rootless).
 

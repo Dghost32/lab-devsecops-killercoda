@@ -18,7 +18,7 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000   # UID del usuario "node" de la imagen; necesario porque el Dockerfile usa un nombre (USER node)
+        runAsUser: 1000
       containers:
         - name: backend
           image: tasks-backend:1.0.0
