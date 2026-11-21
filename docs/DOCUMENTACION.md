@@ -63,8 +63,9 @@ flowchart LR
 | Paso | Qué hace | Por qué |
 |---|---|---|
 | `checkout` con `fetch-depth: 0` | Historia completa de git | Sonar la usa para atribuir *issues* a commits y detectar código nuevo |
+| `setup-node`, `npm ci --ignore-scripts` y pruebas con `--experimental-test-coverage` | Vuelve a correr las 6 pruebas y genera `coverage/lcov.info` | SonarQube Cloud no ejecuta pruebas: la cobertura le llega en este reporte (`sonar.javascript.lcov.reportPaths`). Sin él, la cobertura del código nuevo es 0 % y el *Quality Gate* falla |
 | `SonarSource/sonarqube-auth-action@v1.2` (*secretless*) | Pide a GitHub un token OIDC del job y SonarQube Cloud lo cambia por un token de **30 minutos** limitado a este proyecto, que se exporta como `SONAR_TOKEN` | No hay ningún token guardado en el repositorio: nada que rotar, que dependa de una persona o que se pueda filtrar. El job tiene `id-token: write` y ningún otro job lo tiene |
-| `SonarSource/sonarqube-scan-action@v8.5.0` | Analiza `backend/src` y `frontend` con la organización y el proyecto que devuelve el intercambio OIDC | SAST: bugs, *code smells*, *security hotspots* (como la contraseña quemada `ADMIN_PASSWORD` de `app.js`) |
+| `SonarSource/sonarqube-scan-action@v8.5.0` | Analiza `backend/src` y `frontend` con la organización y el proyecto que devuelve el intercambio OIDC, y espera el resultado del *Quality Gate* (`sonar.qualitygate.wait=true`): si falla, el job falla | SAST: bugs, *code smells*, *security hotspots* (como la contraseña quemada `ADMIN_PASSWORD` de `app.js`) |
 | Aviso en PR desde forks | Si el PR viene de un fork, se omiten los dos pasos anteriores y se deja un `::notice::` | GitHub no entrega `id-token` a los PR de forks. El análisis corre cuando el cambio llega a `main` |
 
 ### Job `seguridad` — Trivy
@@ -175,6 +176,8 @@ El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Qu
 | `npm ci` sin `--ignore-scripts` | `ci.yml`, `backend/Dockerfile`, `Jenkinsfile` | Se agrega `--ignore-scripts`: los *lifecycle scripts* de una dependencia comprometida no se ejecutan en el runner, en el agente de Jenkins ni durante el `docker build`. Ninguna dependencia del lockfile declara scripts de instalación |
 | Express expone su versión | `backend/src/app.js` | `app.disable('x-powered-by')`, con una prueba que verifica que la cabecera ya no aparece |
 
+**El *Quality Gate* pasó a fallar después de estas correcciones** (run `44947925151`): la condición *Coverage on New Code ≥ 80 %* daba 0 %, porque el CI nunca le enviaba un reporte de cobertura a SonarQube Cloud y el primer análisis no tenía código "nuevo" que evaluar. El job salía en verde de todas formas, porque `sonarqube-scan-action` solo sube el análisis y no espera el resultado del gate: otra falla silenciosa. Corrección: el job `calidad` genera `coverage/lcov.info` con la cobertura nativa de Node y el scanner espera el gate con `sonar.qualitygate.wait=true`, así que un gate en rojo ahora rompe el pipeline.
+
 **Pendientes** (ver la [sección 9](#9-limitaciones-y-trabajo-futuro)):
 
 | Regla | Dónde | Por qué no se corrigió en esta entrega |
@@ -247,7 +250,6 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 - **Build multi-stage del backend:** hoy la imagen borra npm, npx, yarn y corepack después de instalar (sección 6.1). Lo de fondo es instalar las dependencias en una etapa de build y ejecutar en una imagen sin gestor de paquetes (por ejemplo distroless `nodejs`), para que el borrado no haga falta.
 - **Builds en el nodo controlador de Jenkins:** el pipeline corre en el *built-in node*, algo aceptable solo en un laboratorio local. En producción el controlador queda con 0 ejecutores y los builds corren en agentes o pods efímeros, para que un build no pueda leer la configuración ni las credenciales del controlador.
 - **Jenkins sobre Java 21:** Jenkins deja de soportarlo a partir del 30 de septiembre de 2027; la imagen base pasaría a `jenkins/jenkins:lts-jdk25`.
-- **Cobertura de pruebas en SonarQube es 0 %:** falta generar el reporte LCOV (`node --test --experimental-test-coverage`) y pasarlo con `sonar.javascript.lcov.reportPaths`.
 - **El stage de despliegue no se ejecutó desde Jenkins:** el contenedor de Jenkins no tiene `kubectl` ni acceso al clúster de kind. El despliegue sí se validó manualmente con `scripts/04-desplegar.sh`. La guía califica la definición de los stages, no su ejecución.
 - **PR desde forks sin análisis de SonarQube:** consecuencia de usar OIDC. Se analiza al hacer merge a `main`. Si el proyecto recibiera muchas contribuciones externas, se usaría un flujo `workflow_run` separado.
 - **Disparo automático de Jenkins:** en local se lanza a mano; con un Jenkins accesible desde Internet se conectaría con un *webhook* de GitHub o con `pollSCM`.

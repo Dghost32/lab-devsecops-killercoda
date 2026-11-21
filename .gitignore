@@ -6,6 +6,7 @@ node_modules/
 reportes/
 trivy-*.txt
 trivy-*.sarif
+coverage/
 
 .DS_Store
 .remember/
