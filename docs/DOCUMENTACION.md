@@ -1,8 +1,8 @@
 # Documentación técnica — Laboratorio de pipelines CI/CD
 
-**Curso:** Fundamentos de DevOps · Maestría en Arquitectura de Software · Universidad de La Sabana
-**Actividad:** Unidad 2, Actividad 3 — Laboratorio técnico: configuración de pipelines CI/CD con Jenkins y GitHub Actions
-**Autor:** Carlos Jiménez
+**Curso:** Fundamentos de DevOps · Maestría en Arquitectura de Software · Universidad de La Sabana\
+**Actividad:** Unidad 2, Actividad 3 — Laboratorio técnico: configuración de pipelines CI/CD con Jenkins y GitHub Actions\
+**Autor:** Carlos Jiménez\
 **Repositorio:** https://github.com/Dghost32/lab-devsecops-killercoda
 
 ---
@@ -229,7 +229,7 @@ Build **#3** del job `tasks-app-cd` sobre el commit `aa78f6c`, lanzado con `ANAL
 | [`trivy-backend-despues.txt`](evidencias/trivy-backend-despues.txt) | Imagen del backend después: sin HIGH ni CRITICAL |
 | [`trivy-frontend-antes.txt`](evidencias/trivy-frontend-antes.txt) | Imagen del frontend con `nginx-unprivileged:1.27-alpine` |
 | [`trivy-frontend-despues.txt`](evidencias/trivy-frontend-despues.txt) | Imagen del frontend con `1.29-alpine` y parches |
-| [`trivy-config.txt`](evidencias/trivy-config.txt) | Hallazgos de configuración en Dockerfiles y manifiestos (sección 8) |
+| [`trivy-config.txt`](evidencias/trivy-config.txt) | Hallazgos de configuración en Dockerfiles y manifiestos ([sección 9](#9-limitaciones-y-trabajo-futuro)) |
 
 ### 7.5 Ejecución manual del laboratorio (macOS)
 
