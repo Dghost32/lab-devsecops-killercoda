@@ -245,7 +245,7 @@ El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Qu
 
 **El *Quality Gate* pasó a fallar después de estas correcciones** (run `44947925151`): la condición *Coverage on New Code ≥ 80 %* daba 0 %, porque el CI nunca le enviaba un reporte de cobertura a SonarQube Cloud y el primer análisis no tenía código "nuevo" que evaluar. El job salía en verde de todas formas, porque `sonarqube-scan-action` solo sube el análisis y no espera el resultado del gate: otra falla silenciosa. Corrección: el job `calidad` genera `coverage/lcov.info` con la cobertura nativa de Node y el scanner espera el gate con `sonar.qualitygate.wait=true`, así que un gate en rojo ahora rompe el pipeline.
 
-**Las pruebas contaban como código sin cubrir** (run `44953440836`, tras la migración a Node 24): el gate volvió a fallar con *Coverage on New Code* en 25 %. SonarQube Cloud clasificaba `backend/test/app.test.js` como código fuente y no como prueba, y le exigía cobertura al propio test. La causa estaba en un aviso del análisis: con el nuevo alcance de SonarQube Cloud, `sonar.sources` y `sonar.tests` ya no tienen efecto. Corrección: `sonar.test.inclusions=backend/test/**` marca las pruebas como tales y `sonar.coverage.exclusions` las saca del cálculo de cobertura. `sonar.sources` y `sonar.tests` se mantienen porque el stage de SonarQube del `Jenkinsfile` apunta a un SonarQube Server, donde sí se usan.
+**Las pruebas contaban como código sin cubrir** (run `44953440836`, tras la migración a Node 24): el gate volvió a fallar con *Coverage on New Code* en 25 %. SonarQube Cloud clasificaba `backend/test/app.test.js` como código fuente y no como prueba, y le exigía cobertura al propio test. La causa estaba en un aviso del análisis: con el nuevo alcance de SonarQube Cloud, `sonar.sources` y `sonar.tests` ya no tienen efecto. Corrección: `sonar.coverage.exclusions=backend/test/**` saca las pruebas del cálculo de cobertura (run `44953858135`: gate aprobado, 100 % de cobertura en el código nuevo). Se probó también `sonar.test.inclusions`, pero el análisis la reporta igual de inefectiva y se retiró. La cobertura total pasó de 93,1 % a **87,9 %**: el valor anterior estaba inflado porque contaba como cubiertas las líneas del propio test. `sonar.sources` y `sonar.tests` se mantienen porque el stage de SonarQube del `Jenkinsfile` apunta a un SonarQube Server, donde sí se usan.
 
 **Pendientes** (ver la [sección 9](#9-limitaciones-y-trabajo-futuro)):
 
@@ -268,7 +268,7 @@ Run [`44948243258`](https://github.com/Dghost32/lab-devsecops-killercoda/actions
 
 ![Pasos del job de SonarQube Cloud: pruebas con cobertura, autenticación OIDC y escaneo](capturas/02-actions-sonar.png)
 
-![Proyecto en SonarQube Cloud: Quality Gate aprobado y cobertura de 93,1 %](capturas/03-sonarcloud.png)
+![Proyecto en SonarQube Cloud: Quality Gate aprobado (cobertura de 93,1 % antes de excluir las pruebas del cálculo; hoy 87,9 %, ver sección 6.6)](capturas/03-sonarcloud.png)
 
 ### 7.2 Jenkins
 
