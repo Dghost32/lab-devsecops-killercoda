@@ -52,7 +52,7 @@ pipeline {
     stage('Pruebas unitarias') {
       steps {
         dir('backend') {
-          sh 'npm ci && npm test'
+          sh 'npm ci --ignore-scripts && npm test'
         }
       }
     }

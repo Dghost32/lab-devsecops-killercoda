@@ -3,6 +3,7 @@ const _ = require('lodash')
 const client = require('prom-client')
 
 const app = express()
+app.disable('x-powered-by')
 app.use(express.json())
 
 // ─── Métricas Prometheus ────────────────────────────────────

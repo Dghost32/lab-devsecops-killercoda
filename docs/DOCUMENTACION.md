@@ -12,7 +12,7 @@
 | Requisito | Dónde se cumple |
 |---|---|
 | A. Repositorio con el código, `.github/workflows/ci.yml` y `README.md` del flujo | [Repositorio](https://github.com/Dghost32/lab-devsecops-killercoda): `backend/`, `frontend/`, [`ci.yml`](../.github/workflows/ci.yml), [`README.md`](../README.md) |
-| B. CI en GitHub Actions en cada push o PR: checkout, dependencias y pruebas (análisis estático opcional) | Job `pruebas` (checkout, `npm ci`, `npm test`), más `calidad` (SonarQube Cloud) y `seguridad` (Trivy). [Sección 3](#3-ci-con-github-actions) |
+| B. CI en GitHub Actions en cada push o PR: checkout, dependencias y pruebas (análisis estático opcional) | Job `pruebas` (checkout, `npm ci --ignore-scripts`, `npm test`), más `calidad` (SonarQube Cloud) y `seguridad` (Trivy). [Sección 3](#3-ci-con-github-actions) |
 | C. CD en Jenkins: clonar, construir imagen Docker y publicar en un registro | [`Jenkinsfile`](../Jenkinsfile) con 8 stages; publica en Docker Hub (`docker.io/dghost32`). [Sección 4](#4-cd-con-jenkins) |
 | Capturas de los pipelines en ejecución | [Sección 7](#7-evidencias) |
 | Justificación de herramientas | [Sección 5](#5-justificación-de-herramientas) |
@@ -55,8 +55,8 @@ flowchart LR
 |---|---|---|
 | `actions/checkout@v5` | Descarga el commit que disparó el evento | Mínimo de la guía; todo se prueba sobre ese commit exacto |
 | `actions/setup-node@v5` (Node 20, caché npm) | Instala Node.js y cachea `~/.npm` usando `package-lock.json` como llave | Misma versión que la imagen `node:20-alpine`. La caché acorta las ejecuciones siguientes |
-| `npm ci` | Instala exactamente lo que dice el lockfile | A diferencia de `npm install`, no modifica el lockfile y falla si no coincide con `package.json`: builds reproducibles |
-| `npm test` | 5 pruebas con el runner nativo `node:test` y `fetch` contra la app levantada en un puerto efímero (health, listar, crear, validación 400, `/metrics`) | Mínimo de la guía; si falla, se cancela todo lo demás |
+| `npm ci --ignore-scripts` | Instala exactamente lo que dice el lockfile, sin ejecutar los scripts `preinstall`/`postinstall` de las dependencias | A diferencia de `npm install`, no modifica el lockfile y falla si no coincide con `package.json`: builds reproducibles. `--ignore-scripts` evita que una dependencia comprometida ejecute código al instalarse (ninguna dependencia del proyecto los necesita) |
+| `npm test` | 6 pruebas con el runner nativo `node:test` y `fetch` contra la app levantada en un puerto efímero (health, listar, crear, validación 400, `/metrics`, sin cabecera `X-Powered-By`) | Mínimo de la guía; si falla, se cancela todo lo demás |
 
 ### Job `calidad` — SonarQube Cloud
 
@@ -79,7 +79,7 @@ flowchart LR
 
 **Buenas prácticas aplicadas:**
 - Las actions de terceros (`aquasecurity/trivy-action` y las dos de SonarSource) están fijadas a un **commit SHA** y no a una etiqueta, para protegerse de que alguien mueva la etiqueta a código comprometido.
-- `permissions` mínimos: `contents: read` en todo el workflow, `security-events: write` para subir el SARIF e `id-token: write` **solo** en el job `calidad`.
+- `permissions` mínimos: `contents: read` en todo el workflow; los permisos de escritura van solo en el job que los usa: `security-events: write` en `seguridad` (subir el SARIF) e `id-token: write` en `calidad` (OIDC).
 - **Sin secretos de larga duración en el CI:** la autenticación con SonarQube Cloud es por OIDC.
 - Ningún paso interpola datos controlados por el usuario (títulos de PR, mensajes de commit) en comandos `run:`.
 
@@ -90,7 +90,7 @@ Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). Cada stage tien
 | # | Stage | Qué hace | Por qué ahí |
 |---|---|---|---|
 | 1 | **Clonar repositorio** | `checkout scm` del repo y la rama configurados en el job | Todo se construye a partir del commit del repositorio, nunca de archivos sueltos del agente |
-| 2 | **Pruebas unitarias** | `npm ci && npm test` en `backend/` | Lo más barato primero: si la lógica falla, no se construye ni se escanea nada |
+| 2 | **Pruebas unitarias** | `npm ci --ignore-scripts && npm test` en `backend/` | Lo más barato primero: si la lógica falla, no se construye ni se escanea nada |
 | 3 | **Análisis estático — SonarQube** | `sonar-scanner-cli` en contenedor, token desde la credencial `sonar-token` | Quality gate de código antes de empaquetarlo. Usar la imagen oficial evita instalar el scanner en el agente |
 | 4 | **Construir imágenes Docker** | `docker build` de backend y frontend **en paralelo**, etiqueta `1.0.<BUILD_NUMBER>` | Son independientes, así que en paralelo se ahorra tiempo. La etiqueta por build hace que cada imagen sea inmutable y trazable a su ejecución |
 | 5 | **Escaneo de imágenes — Trivy** | Reportes HIGH/CRITICAL archivados como artefactos y gate CRITICAL sobre las dos imágenes | Se escanea la imagen final **antes** de publicarla: lo vulnerable no llega al registro |
@@ -127,9 +127,9 @@ Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). Cada stage tien
 **Causa:** la vulnerabilidad no estaba en el código de la app sino en la **imagen base**: `node:20-alpine` trae npm, y npm incluye `tar` 6.2.1 con **CVE-2026-59873** (CRITICAL, denegación de servicio por *gzip bomb*, corregida en 7.5.19). La app corre con `node src/server.js` y no usa npm en tiempo de ejecución.
 
 **Corrección** ([`backend/Dockerfile`](../backend/Dockerfile)):
-1. Borrar npm, npx, yarn y corepack de la imagen después de `npm ci --omit=dev`. Además de quitar la CVE, reduce la superficie de ataque: un atacante dentro del contenedor no tiene gestor de paquetes.
+1. Borrar npm, npx, yarn y corepack de la imagen después de `npm ci --omit=dev --ignore-scripts`. Además de quitar la CVE, reduce la superficie de ataque: un atacante dentro del contenedor no tiene gestor de paquetes.
 2. `apk upgrade --no-cache` para aplicar los parches de openssl, musl y zlib publicados después de la imagen base.
-3. `lodash` de `4.17.15` a `4.18.1`. La última 4.17.x (4.17.23) todavía tenía **CVE-2026-4800** (HIGH, ejecución de código vía `template`), corregida en 4.18.0. La app solo usa `sortBy` y `maxBy`, así que el cambio de versión menor no tiene impacto; las 5 pruebas pasan.
+3. `lodash` de `4.17.15` a `4.18.1`. La última 4.17.x (4.17.23) todavía tenía **CVE-2026-4800** (HIGH, ejecución de código vía `template`), corregida en 4.18.0. La app solo usa `sortBy` y `maxBy`, así que el cambio de versión menor no tiene impacto y las pruebas pasan.
 
 **Frontend** ([`frontend/Dockerfile`](../frontend/Dockerfile)): `nginx-unprivileged:1.27-alpine` pasa a `1.29-alpine` más `apk upgrade` (como root solo durante ese `RUN` y luego `USER 101`). Con las dos imágenes limpias, el gate se extendió también al frontend en el CI y en el `Jenkinsfile`.
 
@@ -162,6 +162,29 @@ El commit `bf5b129` del repositorio original cambió el `ci.yml` a `secrets.SONA
 | `buildWithParameters` respondía 400 en el primer build | Jenkins registra los `parameters` del `Jenkinsfile` solo después de ejecutarlo una vez | Declarar los mismos parámetros en la definición del job (JCasC/Job DSL) |
 | El admin podía quedar con contraseña vacía si faltaba la variable | JCasC sustituye una variable inexistente por cadena vacía | `entrypoint.sh` aborta el arranque si `JENKINS_ADMIN_PASSWORD` falta o tiene menos de 12 caracteres |
 | Los stages de SonarQube y despliegue fallarían en local | El agente local no tiene `kubectl` ni servidor Sonar | Parámetros `ANALISIS_SONAR`/`DESPLEGAR` con `when { expression { ... } }` |
+
+### 6.5 Hallazgos de SonarQube Cloud
+
+El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Quality Gate*, que en el primer análisis evalúa todo el código como nuevo, y dejó 28 *issues* abiertos: 11 vulnerabilidades, 1 bug y 16 *code smells*.
+
+**Corregidos:**
+
+| Regla | Dónde | Corrección |
+|---|---|---|
+| Permiso de escritura a nivel de workflow | `ci.yml` | `security-events: write` pasó del workflow al job `seguridad`. Así `pruebas` y `calidad` no reciben un token que puede escribir alertas de seguridad |
+| `npm ci` sin `--ignore-scripts` | `ci.yml`, `backend/Dockerfile`, `Jenkinsfile` | Se agrega `--ignore-scripts`: los *lifecycle scripts* de una dependencia comprometida no se ejecutan en el runner, en el agente de Jenkins ni durante el `docker build`. Ninguna dependencia del lockfile declara scripts de instalación |
+| Express expone su versión | `backend/src/app.js` | `app.disable('x-powered-by')`, con una prueba que verifica que la cabecera ya no aparece |
+
+**Pendientes** (ver la [sección 9](#9-limitaciones-y-trabajo-futuro)):
+
+| Regla | Dónde | Por qué no se corrigió en esta entrega |
+|---|---|---|
+| Credencial quemada | `k8s/monitoring/prometheus-grafana.yaml` (`GF_SECURITY_ADMIN_PASSWORD`) | Es parte del stack de monitoreo del laboratorio original; la solución es un `Secret` de Kubernetes creado fuera del repositorio |
+| *Service account* montado automáticamente | `k8s/10-backend.yaml`, `k8s/20-frontend.yaml`, Grafana | Se corrige con `automountServiceAccountToken: false`; las apps no llaman a la API de Kubernetes |
+| Sin `requests` de almacenamiento efímero | Los mismos Deployments | Se corrige con `resources.requests.ephemeral-storage` |
+| Descargas `curl` sin forzar HTTPS en redirecciones | `scripts/00-instalar-herramientas.sh` | Se corrige con `curl --proto '=https'`; el script solo se usa para preparar la máquina del laboratorio |
+| `<input>` sin `<label>` | `frontend/index.html` | Accesibilidad, no seguridad |
+| `[` en lugar de `[[` en condicionales | Scripts de bash | *Code smell* de estilo; no cambia el comportamiento |
 
 ## 7. Evidencias
 
@@ -219,6 +242,7 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 ## 9. Limitaciones y trabajo futuro
 
 - **Configuración de Kubernetes:** Trivy reporta 10 hallazgos HIGH en los manifiestos (`readOnlyRootFilesystem` sin definir y `securityContext` por defecto en frontend y monitoreo). Corregirlos requiere montar `emptyDir` en las rutas que escriben Nginx y Prometheus.
+- **Hallazgos abiertos de SonarQube Cloud:** credencial de Grafana quemada en el manifiesto, *service accounts* montados sin necesidad, `curl` sin `--proto '=https'` y *code smells* de estilo en los scripts (detalle en la [sección 6.5](#65-hallazgos-de-sonarqube-cloud)).
 - **Node.js 20 llegó a fin de vida (abril 2026).** La imagen pasa el escaneo hoy, pero el siguiente paso es migrar a Node 22 o 24 LTS.
 - **Cobertura de pruebas en SonarQube es 0 %:** falta generar el reporte LCOV (`node --test --experimental-test-coverage`) y pasarlo con `sonar.javascript.lcov.reportPaths`.
 - **El stage de despliegue no se ejecutó desde Jenkins:** el contenedor de Jenkins no tiene `kubectl` ni acceso al clúster de kind. El despliegue sí se validó manualmente con `scripts/04-desplegar.sh`. La guía califica la definición de los stages, no su ejecución.

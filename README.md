@@ -35,7 +35,7 @@ flowchart LR
 
     subgraph CI["CI · GitHub Actions (.github/workflows/ci.yml)"]
         direction LR
-        T["pruebas<br/>checkout · npm ci · npm test"] --> Q["calidad<br/>SonarQube Cloud"]
+        T["pruebas<br/>checkout · npm ci --ignore-scripts · npm test"] --> Q["calidad<br/>SonarQube Cloud"]
         T --> S["seguridad<br/>Trivy fs + config<br/>build de imágenes<br/>Trivy imagen → SARIF"]
         S --> GATE{"¿CRITICAL con<br/>parche?"}
         GATE -- "sí" --> X["falla el pipeline"]

@@ -52,3 +52,8 @@ test('GET /metrics expone métricas Prometheus', async () => {
   const text = await res.text()
   assert.match(text, /http_requests_total/)
 })
+
+test('las respuestas no exponen la versión de Express', async () => {
+  const res = await fetch(`${base}/api/health`)
+  assert.strictEqual(res.headers.get('x-powered-by'), null)
+})
