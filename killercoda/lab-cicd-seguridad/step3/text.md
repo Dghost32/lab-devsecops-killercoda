@@ -22,7 +22,7 @@ El backend usa `lodash 4.17.15` a propósito. **Corrígelo** y vuelve a escanear
 
 ```
 sed -i 's/"lodash": "4.17.15"/"lodash": "4.17.21"/' backend/package.json
-docker run --rm -v "$PWD/backend:/app" -w /app node:20-alpine npm install --package-lock-only --no-audit --no-fund
+docker run --rm -v "$PWD/backend:/app" -w /app node:24-alpine npm install --package-lock-only --no-audit --no-fund
 trivy fs --scanners vuln --severity HIGH,CRITICAL backend/
 ```{{exec}}
 

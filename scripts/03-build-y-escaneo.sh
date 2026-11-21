@@ -3,8 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p reportes
 
-echo "==> Pruebas unitarias del backend (en contenedor Node 20)"
-docker run --rm -v "$(pwd)/backend:/app" -w /app node:20-alpine \
+echo "==> Pruebas unitarias del backend (en contenedor Node 24)"
+docker run --rm -v "$(pwd)/backend:/app" -w /app node:24-alpine \
   sh -c "npm ci --no-audit --no-fund && npm test"
 
 echo "==> Trivy: dependencias del código fuente (SCA)"

@@ -54,7 +54,7 @@ flowchart LR
 | Paso | Qué hace | Por qué |
 |---|---|---|
 | `actions/checkout@v5` | Descarga el commit que disparó el evento | Mínimo de la guía; todo se prueba sobre ese commit exacto |
-| `actions/setup-node@v5` (Node 20, caché npm) | Instala Node.js y cachea `~/.npm` usando `package-lock.json` como llave | Misma versión que la imagen `node:20-alpine`. La caché acorta las ejecuciones siguientes |
+| `actions/setup-node@v5` (Node 24 LTS, caché npm) | Instala Node.js y cachea `~/.npm` usando `package-lock.json` como llave | Misma versión que la imagen `node:24-alpine`. La caché acorta las ejecuciones siguientes |
 | `npm ci --ignore-scripts` | Instala exactamente lo que dice el lockfile, sin ejecutar los scripts `preinstall`/`postinstall` de las dependencias | A diferencia de `npm install`, no modifica el lockfile y falla si no coincide con `package.json`: builds reproducibles. `--ignore-scripts` evita que una dependencia comprometida ejecute código al instalarse (ninguna dependencia del proyecto los necesita) |
 | `npm test` | 6 pruebas con el runner nativo `node:test` y `fetch` contra la app levantada en un puerto efímero (health, listar, crear, validación 400, `/metrics`, sin cabecera `X-Powered-By`) | Mínimo de la guía; si falla, se cancela todo lo demás |
 
@@ -78,6 +78,33 @@ flowchart LR
 | `upload-sarif@v4` (`if: always()`) | Sube el SARIF aunque un paso anterior falle | La evidencia se conserva incluso cuando el pipeline se rompe |
 | **Quality gate** backend y frontend | `--severity CRITICAL --ignore-unfixed --exit-code 1` | Bloquea el merge si hay una vulnerabilidad CRITICAL **con parche disponible**. `ignore-unfixed` evita bloquear por algo que el equipo no puede corregir todavía |
 
+**Fragmentos clave del `ci.yml`.** Autenticación sin secretos y análisis que espera el *Quality Gate* (job `calidad`):
+
+```yaml
+- name: Autenticar con SonarQube Cloud (OIDC, sin secretos)
+  id: auth
+  uses: SonarSource/sonarqube-auth-action@b372e2c2930aadfcc4f4399446da1e12772709ad # v1.2
+
+- name: SonarQube Scan
+  uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
+  with:
+    args: >
+      -Dsonar.organization=${{ steps.auth.outputs.organization }}
+      -Dsonar.projectKey=${{ steps.auth.outputs.project-key }}
+```
+
+*Quality gate* de seguridad (job `seguridad`, se repite para el frontend):
+
+```yaml
+- name: Quality gate — bloquear si hay CRITICAL
+  uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+  with:
+    image-ref: tasks-backend:${{ github.sha }}
+    severity: CRITICAL
+    ignore-unfixed: true
+    exit-code: '1'
+```
+
 **Buenas prácticas aplicadas:**
 - Las actions de terceros (`aquasecurity/trivy-action` y las dos de SonarSource) están fijadas a un **commit SHA** y no a una etiqueta, para protegerse de que alguien mueva la etiqueta a código comprometido.
 - `permissions` mínimos: `contents: read` en todo el workflow; los permisos de escritura van solo en el job que los usa: `security-events: write` en `seguridad` (subir el SARIF) e `id-token: write` en `calidad` (OIDC).
@@ -100,11 +127,31 @@ Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). La justificaci�
 | 8 | **Smoke test** | `curl` a `http://frontend/api/health` desde un pod efímero | Valida el camino completo frontend → proxy Nginx → backend dentro del clúster |
 | — | `post { failure }` | `kubectl rollout undo` de backend y frontend (si se intentó desplegar) | Si el despliegue o el smoke test fallan, el clúster vuelve a la versión anterior sin intervención manual |
 
+**Fragmento clave del `Jenkinsfile`.** Publicación en el registro: el token sale del almacén de credenciales de Jenkins, entra por `stdin` y la sesión se cierra aunque el push falle:
+
+```groovy
+stage('Publicar en el registro') {
+  when { expression { params.PUBLICAR } }
+  steps {
+    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                      usernameVariable: 'REG_USER',
+                                      passwordVariable: 'REG_PASS')]) {
+      sh 'echo "$REG_PASS" | docker login -u "$REG_USER" --password-stdin'
+      sh "docker push ${BACKEND_IMG}"
+      sh "docker push ${FRONTEND_IMG}"
+    }
+  }
+  post {
+    always { sh 'docker logout || true' }
+  }
+}
+```
+
 **Opciones del pipeline:** `timestamps()` (auditoría), `timeout(30 min)` (evita builds colgados), `buildDiscarder(20)` (no llena el disco) y `disableConcurrentBuilds()` (dos despliegues simultáneos se pisarían).
 
 **Parámetros `ANALISIS_SONAR`, `PUBLICAR` y `DESPLEGAR`:** por defecto están en `true`, así que el pipeline completo es el comportamiento normal. Existen para correr el mismo `Jenkinsfile` en ambientes sin parte de la infraestructura (un Jenkins local sin clúster, por ejemplo). Las etapas apagadas se marcan como *skipped* y no como fallidas.
 
-**Entorno de ejecución local** ([`jenkins/`](../jenkins/README.md)): imagen `jenkins/jenkins:lts-jdk21` con Docker CLI, Node.js 20 y Trivy, configurada como código con JCasC (usuario admin, sin acceso anónimo y el job `tasks-app-cd` creado al arrancar desde este repositorio). Sin `JENKINS_ADMIN_PASSWORD`, el contenedor no arranca.
+**Entorno de ejecución local** ([`jenkins/`](../jenkins/README.md)): imagen `jenkins/jenkins:lts-jdk21` con Docker CLI, Node.js 24 LTS y Trivy, configurada como código con JCasC (usuario admin, sin acceso anónimo y el job `tasks-app-cd` creado al arrancar desde este repositorio). Sin `JENKINS_ADMIN_PASSWORD`, el contenedor no arranca.
 
 ## 5. Justificación de herramientas
 
@@ -118,6 +165,18 @@ Archivo: [`Jenkinsfile`](../Jenkinsfile) (pipeline declarativo). La justificaci�
 | **Docker Hub** | Registro de imágenes | Registro público por defecto de Docker: no requiere configuración extra en `docker push`/`pull` ni en Kubernetes, y tiene un plan gratuito con *personal access tokens* de permisos acotados |
 | **Kubernetes (kind)** | Orquestación y ambiente de despliegue | kind levanta un clúster real de Kubernetes dentro de Docker en segundos: el mismo API y los mismos manifiestos que en producción, sin costo de nube. Aporta *rolling updates*, *probes*, `securityContext` y rollback nativo (`rollout undo`), que el pipeline aprovecha |
 | **Prometheus + Grafana** | Monitoreo | El backend expone `/metrics` con `prom-client`; Prometheus lo recolecta y Grafana lo grafica con PromQL. Cierra el ciclo DevOps con retroalimentación desde operación |
+
+**Versiones usadas** (vigentes en noviembre de 2026): Jenkins 2.580.2 LTS sobre Java 21, Trivy 0.76.2, SonarQube Scan Action 8.5.0 (scanner 8.4), `actions/checkout` y `actions/setup-node` v5, Node.js 24 LTS (24.22.3), Docker 28.5 y Kubernetes 1.37 (kind).
+
+**Alternativas consideradas:**
+
+| En lugar de | Se descartó | Por qué |
+|---|---|---|
+| GitHub Actions | GitLab CI, CircleCI | El código ya vive en GitHub. Otra plataforma agrega una cuenta, una integración y un lugar más donde ver resultados, sin ganar nada para este proyecto |
+| Jenkins | Argo CD, GitHub Actions también para CD | La guía pide Jenkins. Además, Argo CD (GitOps) necesita un repositorio de manifiestos aparte y un clúster con acceso al repositorio; Jenkins puede construir, escanear, publicar y desplegar en un mismo pipeline dentro de la red local |
+| Trivy | Snyk, Grype | Snyk limita el plan gratuito y requiere cuenta y token. Grype escanea vulnerabilidades pero no configuración de Dockerfile y Kubernetes; Trivy cubre las dos cosas y exporta SARIF |
+| SonarQube Cloud | CodeQL | CodeQL se enfoca en vulnerabilidades; SonarQube suma *code smells*, duplicación, cobertura y un *quality gate* con umbrales sobre el código nuevo |
+| Docker Hub | GitHub Container Registry | La guía menciona Docker Hub, y es el registro que Docker y Kubernetes usan por defecto sin configuración extra |
 
 ## 6. Hallazgos y correcciones
 
@@ -164,7 +223,15 @@ El commit `bf5b129` del repositorio original cambió el `ci.yml` a `secrets.SONA
 | El admin podía quedar con contraseña vacía si faltaba la variable | JCasC sustituye una variable inexistente por cadena vacía | `entrypoint.sh` aborta el arranque si `JENKINS_ADMIN_PASSWORD` falta o tiene menos de 12 caracteres |
 | Los stages de SonarQube y despliegue fallarían en local | El agente local no tiene `kubectl` ni servidor Sonar | Parámetros `ANALISIS_SONAR`/`DESPLEGAR` con `when { expression { ... } }` |
 
-### 6.5 Hallazgos de SonarQube Cloud
+### 6.5 Node.js 20 sin soporte, y fuera del alcance de Trivy
+
+- **Hallazgo:** el laboratorio original usaba `node:20-alpine`. Node.js 20 llegó a fin de vida el **30 de abril de 2026**; la imagen oficial se actualizó por última vez el 15 de abril y quedó en `v20.20.2`. Las vulnerabilidades del runtime publicadas después ya no tienen parche para esa versión.
+- **Por qué el escaneo no lo mostraba:** Trivy reportaba 0 CRITICAL y 0 HIGH, pero solo inventaría los paquetes de Alpine (`apk`) y los de `node_modules`. El binario de Node.js viene del tarball oficial y no del gestor de paquetes, así que Trivy no lo evalúa. Un "0 vulnerabilidades" no cubría el runtime.
+- **Corrección:** migración a **Node.js 24 LTS** (24.22.3, soporte hasta abril de 2028) en `backend/Dockerfile` (`node:24-alpine`), en los dos jobs del CI (`setup-node`), en la imagen de Jenkins y en `scripts/03`. `package.json` declara `"engines": { "node": ">=24" }`. Las 6 pruebas pasan, la imagen sigue corriendo con UID 1000 y Trivy reporta 0 CRITICAL y 0 HIGH sobre Alpine 3.24 ([`trivy-backend-node24.txt`](evidencias/trivy-backend-node24.txt)).
+- **Por qué 24 y no 26:** Node 26 es LTS activa desde el 28 de octubre de 2026, menos de un mes antes de esta entrega. Node 24 tiene más de un año como LTS, el ecosistema ya lo probó y su soporte cubre la vida del proyecto.
+- **Lección:** la versión del runtime es una decisión de seguridad que hay que revisar contra su calendario de soporte, no solo contra el escáner.
+
+### 6.6 Hallazgos de SonarQube Cloud
 
 El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Quality Gate*, que en el primer análisis evalúa todo el código como nuevo, y dejó 28 *issues* abiertos: 11 vulnerabilidades, 1 bug y 16 *code smells*.
 
@@ -227,6 +294,7 @@ Build **#3** del job `tasks-app-cd` sobre el commit `aa78f6c`, lanzado con `ANAL
 |---|---|
 | [`trivy-backend-antes.txt`](evidencias/trivy-backend-antes.txt) | Imagen del backend antes de la corrección: CVE-2026-59873 en `tar` |
 | [`trivy-backend-despues.txt`](evidencias/trivy-backend-despues.txt) | Imagen del backend después: sin HIGH ni CRITICAL |
+| [`trivy-backend-node24.txt`](evidencias/trivy-backend-node24.txt) | Imagen del backend con Node.js 24 LTS (sección 6.5): sin HIGH ni CRITICAL |
 | [`trivy-frontend-antes.txt`](evidencias/trivy-frontend-antes.txt) | Imagen del frontend con `nginx-unprivileged:1.27-alpine` |
 | [`trivy-frontend-despues.txt`](evidencias/trivy-frontend-despues.txt) | Imagen del frontend con `1.29-alpine` y parches |
 | [`trivy-config.txt`](evidencias/trivy-config.txt) | Hallazgos de configuración en Dockerfiles y manifiestos ([sección 9](#9-limitaciones-y-trabajo-futuro)) |
@@ -255,8 +323,8 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 ## 9. Limitaciones y trabajo futuro
 
 - **Configuración de Kubernetes:** Trivy reporta 10 hallazgos HIGH en los manifiestos (`readOnlyRootFilesystem` sin definir y `securityContext` por defecto en frontend y monitoreo). Corregirlos requiere montar `emptyDir` en las rutas que escriben Nginx y Prometheus.
-- **Hallazgos abiertos de SonarQube Cloud:** credencial de Grafana quemada en el manifiesto, *service accounts* montados sin necesidad, `curl` sin `--proto '=https'` y *code smells* de estilo en los scripts (detalle en la [sección 6.5](#65-hallazgos-de-sonarqube-cloud)).
-- **Node.js 20 llegó a fin de vida (abril 2026).** La imagen pasa el escaneo hoy, pero el siguiente paso es migrar a Node 22 o 24 LTS.
+- **Hallazgos abiertos de SonarQube Cloud:** credencial de Grafana quemada en el manifiesto, *service accounts* montados sin necesidad, `curl` sin `--proto '=https'` y *code smells* de estilo en los scripts (detalle en la [sección 6.6](#66-hallazgos-de-sonarqube-cloud)).
+- **`prom-client` está marcado como obsoleto:** `npm` avisa que lo reemplaza `@prometheus-io/client`. Funciona y no tiene vulnerabilidades conocidas, pero conviene migrar antes de que deje de recibir parches.
 - **Build multi-stage del backend:** hoy la imagen borra npm, npx, yarn y corepack después de instalar (sección 6.1). Lo de fondo es instalar las dependencias en una etapa de build y ejecutar en una imagen sin gestor de paquetes (por ejemplo distroless `nodejs`), para que el borrado no haga falta.
 - **Imágenes solo para `linux/arm64`:** Jenkins corre en un Mac con Apple Silicon y construye para la arquitectura del equipo. Para un clúster `amd64` habría que construir multi-arquitectura con `docker buildx build --platform linux/amd64,linux/arm64 --push`.
 - **Builds en el nodo controlador de Jenkins:** el pipeline corre en el *built-in node*, algo aceptable solo en un laboratorio local. En producción el controlador queda con 0 ejecutores y los builds corren en agentes o pods efímeros, para que un build no pueda leer la configuración ni las credenciales del controlador.

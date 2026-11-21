@@ -8,6 +8,17 @@ Parte del laboratorio DevSecOps de la profesora María Fernanda Ochoa ([mafeopa/
 
 La documentación técnica completa (justificación de herramientas, evidencias, hallazgos y capturas) está en **[docs/DOCUMENTACION.md](docs/DOCUMENTACION.md)**.
 
+## Enlaces
+
+| Qué | Dónde |
+|---|---|
+| Documentación técnica | [docs/DOCUMENTACION.md](docs/DOCUMENTACION.md) · [versión PDF](docs/DOCUMENTACION.pdf) |
+| Capturas de los pipelines en ejecución | [docs/capturas/](docs/capturas/) |
+| Ejecuciones del CI | [GitHub Actions](https://github.com/Dghost32/lab-devsecops-killercoda/actions/workflows/ci.yml) |
+| Análisis estático | [Proyecto en SonarQube Cloud](https://sonarcloud.io/project/overview?id=Dghost32_lab-devsecops-killercoda) |
+| Imágenes publicadas por Jenkins | [dghost32/tasks-backend](https://hub.docker.com/r/dghost32/tasks-backend/tags) · [dghost32/tasks-frontend](https://hub.docker.com/r/dghost32/tasks-frontend/tags) |
+| Reportes de Trivy (antes y después) | [docs/evidencias/](docs/evidencias/) |
+
 ## La aplicación
 
 API de tareas de dos capas: **frontend** (Nginx sin privilegios, puerto 8080) y **backend** (Node.js/Express, puerto 3000, con `/api/health`, `/api/tasks` y `/metrics` para Prometheus).
@@ -62,7 +73,7 @@ flowchart LR
 | Ruta | Contenido |
 |---|---|
 | `.github/workflows/ci.yml` | Pipeline de CI: jobs `pruebas`, `calidad` y `seguridad` |
-| `Jenkinsfile` | Pipeline de CD: 8 stages (justificación en `docs/DOCUMENTACION.md` §4) |
+| `Jenkinsfile` | Pipeline de CD: 8 stages ([justificación de cada stage](docs/DOCUMENTACION.md#4-cd-con-jenkins)) |
 | `jenkins/` | Imagen y configuración como código para correr el `Jenkinsfile` en local ([instrucciones](jenkins/README.md)) |
 | `backend/`, `frontend/` | Código y `Dockerfile` de cada capa |
 | `k8s/` | Namespace, Deployments y Services; `k8s/monitoring/` con Prometheus y Grafana |

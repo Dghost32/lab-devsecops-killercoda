@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "API de tareas — laboratorio DevSecOps (Fundamentos DevOps)",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/app.test.js"

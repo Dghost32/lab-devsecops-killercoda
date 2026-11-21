@@ -4,7 +4,7 @@ Imagen de Jenkins que corre el `Jenkinsfile` del repositorio sin configuración 
 
 | Archivo | Qué hace |
 |---|---|
-| `Dockerfile` | Parte de `jenkins/jenkins:lts-jdk21` y agrega Docker CLI 28, Node.js 20 y Trivy 0.76.2, que son las herramientas que usan los stages |
+| `Dockerfile` | Parte de `jenkins/jenkins:lts-jdk21` y agrega Docker CLI 28, Node.js 24 LTS y Trivy 0.76.2, que son las herramientas que usan los stages |
 | `plugins.txt` | Plugins de Pipeline, Git, Credentials Binding, Timestamper, vistas de stages, JCasC y Job DSL |
 | `casc.yaml` | Configuración como código: usuario `admin`, sin registro abierto, sin acceso anónimo y el job `tasks-app-cd` apuntando a este repo |
 | `entrypoint.sh` | No deja arrancar Jenkins si falta `JENKINS_ADMIN_PASSWORD` o tiene menos de 12 caracteres |

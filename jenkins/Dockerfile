@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS node
+FROM node:24-bookworm-slim AS node
 FROM docker:28-cli AS docker
 FROM aquasec/trivy:0.76.2 AS trivy
 
