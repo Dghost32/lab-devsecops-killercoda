@@ -22,4 +22,7 @@ COPY casc.yaml /usr/share/jenkins/casc.yaml
 ENV CASC_JENKINS_CONFIG=/usr/share/jenkins/casc.yaml \
     JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
 
+COPY --chmod=755 entrypoint.sh /usr/local/bin/lab-entrypoint.sh
+
 USER jenkins
+ENTRYPOINT ["/usr/local/bin/lab-entrypoint.sh"]

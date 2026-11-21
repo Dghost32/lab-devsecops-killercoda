@@ -22,6 +22,12 @@ jobs:
   - script: >
       pipelineJob('tasks-app-cd') {
         description('CD del laboratorio: clonar, pruebas, build, Trivy y publicación en Docker Hub')
+        // Mismos parámetros del Jenkinsfile, declarados aquí para que existan desde el primer build.
+        parameters {
+          booleanParam('ANALISIS_SONAR', true, 'Analizar con SonarQube (requiere servidor y credencial sonar-token)')
+          booleanParam('PUBLICAR', true, 'Publicar las imágenes en Docker Hub (requiere credencial dockerhub-creds)')
+          booleanParam('DESPLEGAR', true, 'Desplegar en Kubernetes y correr el smoke test (requiere kubectl con acceso al clúster)')
+        }
         definition {
           cpsScm {
             scm {
