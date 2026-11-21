@@ -193,23 +193,33 @@ El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Qu
 
 ### 7.1 GitHub Actions
 
-- Ejecuciones: https://github.com/Dghost32/lab-devsecops-killercoda/actions/workflows/ci.yml
+Run [`44948243258`](https://github.com/Dghost32/lab-devsecops-killercoda/actions/runs/44948243258) (#4 del workflow), disparado por el push del commit `8a6a93f` a `main`: los tres jobs en verde en 1 min 18 s. Historial: https://github.com/Dghost32/lab-devsecops-killercoda/actions/workflows/ci.yml
 
-![Run del CI en verde](capturas/01-actions-run.png)
+![Run del CI en verde, con el resumen del análisis secretless](capturas/01-actions-run.png)
 
-![Job de SonarQube](capturas/02-actions-sonar.png)
+![Pasos del job de SonarQube Cloud: pruebas con cobertura, autenticación OIDC y escaneo](capturas/02-actions-sonar.png)
 
-![Proyecto en SonarQube Cloud](capturas/03-sonarcloud.png)
+![Proyecto en SonarQube Cloud: Quality Gate aprobado y cobertura de 93,1 %](capturas/03-sonarcloud.png)
 
 ### 7.2 Jenkins
 
-![Vista de stages del job tasks-app-cd](capturas/04-jenkins-stages.png)
+Build **#3** del job `tasks-app-cd` sobre el commit `aa78f6c`, lanzado con `ANALISIS_SONAR=false`, `PUBLICAR=true` y `DESPLEGAR=false` (por qué, en la [sección 9](#9-limitaciones-y-trabajo-futuro)). Duración: 22 s.
 
-![Consola del build](capturas/05-jenkins-consola.png)
+![Stages del build #3: Backend y Frontend en paralelo; SonarQube, despliegue y smoke test omitidos por parámetro](capturas/04-jenkins-stages.png)
+
+![Resumen del build #3: revisión, commits incluidos y reportes de Trivy archivados](capturas/04b-jenkins-build.png)
+
+![Consola, stage Clonar repositorio](capturas/05b-jenkins-clonar.png)
+
+![Consola, stage Publicar en el registro: token enmascarado, login con --password-stdin y push](capturas/05-jenkins-consola.png)
+
+![Consola, fin del build: digest publicado, docker logout y Finished: SUCCESS](capturas/05c-jenkins-fin.png)
 
 ### 7.3 Docker Hub
 
-![Imágenes publicadas en Docker Hub](capturas/06-dockerhub.png)
+`dghost32/tasks-backend` y `dghost32/tasks-frontend` con las etiquetas `1.0.2` y `1.0.3` (una por build de Jenkins). El digest de `tasks-backend:1.0.3` (`sha256:cbdb3d0017c0…`) es el mismo que imprime la consola del build #3.
+
+![Etiquetas de tasks-backend en Docker Hub](capturas/06-dockerhub.png)
 
 ### 7.4 Reportes de Trivy
 
@@ -238,7 +248,7 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 | Secreto | Dónde vive | Cómo se usa |
 |---|---|---|
 | Token de SonarQube Cloud | **No existe un token guardado.** Se genera en cada ejecución por OIDC (*secretless*), dura 30 minutos y solo sirve para este proyecto | `sonarqube-auth-action` lo exporta como `SONAR_TOKEN` para el paso siguiente; GitHub lo enmascara en los logs |
-| Token de Docker Hub | Credencial `dockerhub-creds` en Jenkins (PAT con permiso *Read & Write*) | `withCredentials` + `docker login --password-stdin` |
+| Token de Docker Hub | Credencial `dockerhub-creds` en Jenkins (PAT con permiso *Read & Write*, sin *Delete*, con vencimiento) | `withCredentials` + `docker login --password-stdin`; Jenkins enmascara el valor en el log. `docker login` lo deja en `~/.docker/config.json` del agente mientras dura el push (el `WARNING` que se ve en la consola), y `docker logout` en `post { always }` lo borra aunque el push falle |
 | Contraseña del admin de Jenkins | Variable de entorno al lanzar el contenedor | Leída por JCasC; nunca se versiona |
 | Token del SonarQube local | `.sonar-token` (local) | Excluido en `.gitignore` |
 
@@ -248,6 +258,7 @@ Antes de automatizar se corrió cada herramienta a mano, en un Mac con Apple Sil
 - **Hallazgos abiertos de SonarQube Cloud:** credencial de Grafana quemada en el manifiesto, *service accounts* montados sin necesidad, `curl` sin `--proto '=https'` y *code smells* de estilo en los scripts (detalle en la [sección 6.5](#65-hallazgos-de-sonarqube-cloud)).
 - **Node.js 20 llegó a fin de vida (abril 2026).** La imagen pasa el escaneo hoy, pero el siguiente paso es migrar a Node 22 o 24 LTS.
 - **Build multi-stage del backend:** hoy la imagen borra npm, npx, yarn y corepack después de instalar (sección 6.1). Lo de fondo es instalar las dependencias en una etapa de build y ejecutar en una imagen sin gestor de paquetes (por ejemplo distroless `nodejs`), para que el borrado no haga falta.
+- **Imágenes solo para `linux/arm64`:** Jenkins corre en un Mac con Apple Silicon y construye para la arquitectura del equipo. Para un clúster `amd64` habría que construir multi-arquitectura con `docker buildx build --platform linux/amd64,linux/arm64 --push`.
 - **Builds en el nodo controlador de Jenkins:** el pipeline corre en el *built-in node*, algo aceptable solo en un laboratorio local. En producción el controlador queda con 0 ejecutores y los builds corren en agentes o pods efímeros, para que un build no pueda leer la configuración ni las credenciales del controlador.
 - **Jenkins sobre Java 21:** Jenkins deja de soportarlo a partir del 30 de septiembre de 2027; la imagen base pasaría a `jenkins/jenkins:lts-jdk25`.
 - **El stage de despliegue no se ejecutó desde Jenkins:** el contenedor de Jenkins no tiene `kubectl` ni acceso al clúster de kind. El despliegue sí se validó manualmente con `scripts/04-desplegar.sh`. La guía califica la definición de los stages, no su ejecución.
