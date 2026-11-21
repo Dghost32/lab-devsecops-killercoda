@@ -90,6 +90,7 @@ pipeline {
         sh "trivy image --severity HIGH,CRITICAL --format table --output trivy-frontend.txt ${FRONTEND_IMG}"
         // Quality gate: detiene el pipeline si hay vulnerabilidades CRITICAL con solución disponible
         sh "trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 ${BACKEND_IMG}"
+        sh "trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 ${FRONTEND_IMG}"
       }
       post {
         always { archiveArtifacts artifacts: 'trivy-*.txt', allowEmptyArchive: true }
