@@ -245,6 +245,8 @@ El primer análisis completo en SonarQube Cloud (run `44946432460`) pasó el *Qu
 
 **El *Quality Gate* pasó a fallar después de estas correcciones** (run `44947925151`): la condición *Coverage on New Code ≥ 80 %* daba 0 %, porque el CI nunca le enviaba un reporte de cobertura a SonarQube Cloud y el primer análisis no tenía código "nuevo" que evaluar. El job salía en verde de todas formas, porque `sonarqube-scan-action` solo sube el análisis y no espera el resultado del gate: otra falla silenciosa. Corrección: el job `calidad` genera `coverage/lcov.info` con la cobertura nativa de Node y el scanner espera el gate con `sonar.qualitygate.wait=true`, así que un gate en rojo ahora rompe el pipeline.
 
+**Las pruebas contaban como código sin cubrir** (run `44953440836`, tras la migración a Node 24): el gate volvió a fallar con *Coverage on New Code* en 25 %. SonarQube Cloud clasificaba `backend/test/app.test.js` como código fuente y no como prueba, y le exigía cobertura al propio test. La causa estaba en un aviso del análisis: con el nuevo alcance de SonarQube Cloud, `sonar.sources` y `sonar.tests` ya no tienen efecto. Corrección: `sonar.test.inclusions=backend/test/**` marca las pruebas como tales y `sonar.coverage.exclusions` las saca del cálculo de cobertura. `sonar.sources` y `sonar.tests` se mantienen porque el stage de SonarQube del `Jenkinsfile` apunta a un SonarQube Server, donde sí se usan.
+
 **Pendientes** (ver la [sección 9](#9-limitaciones-y-trabajo-futuro)):
 
 | Regla | Dónde | Por qué no se corrigió en esta entrega |
@@ -272,6 +274,8 @@ Run [`44948243258`](https://github.com/Dghost32/lab-devsecops-killercoda/actions
 
 Build **#3** del job `tasks-app-cd` sobre el commit `aa78f6c`, lanzado con `ANALISIS_SONAR=false`, `PUBLICAR=true` y `DESPLEGAR=false` (por qué, en la [sección 9](#9-limitaciones-y-trabajo-futuro)). Duración: 22 s.
 
+Después de migrar a Node.js 24 ([sección 6.5](#65-nodejs-20-sin-soporte-y-fuera-del-alcance-de-trivy)) se corrió el build **#4** sobre el commit `cfd0b76`, con los mismos parámetros: SUCCESS en 27 s, 6 de 6 pruebas, imagen construida `FROM node:24-alpine` y publicada como `1.0.4`. Las capturas son del build #3; el #4 recorre los mismos stages.
+
 ![Stages del build #3: Backend y Frontend en paralelo; SonarQube, despliegue y smoke test omitidos por parámetro](capturas/04-jenkins-stages.png)
 
 ![Resumen del build #3: revisión, commits incluidos y reportes de Trivy archivados](capturas/04b-jenkins-build.png)
@@ -284,7 +288,7 @@ Build **#3** del job `tasks-app-cd` sobre el commit `aa78f6c`, lanzado con `ANAL
 
 ### 7.3 Docker Hub
 
-`dghost32/tasks-backend` y `dghost32/tasks-frontend` con las etiquetas `1.0.2` y `1.0.3` (una por build de Jenkins). El digest de `tasks-backend:1.0.3` (`sha256:cbdb3d0017c0…`) es el mismo que imprime la consola del build #3.
+`dghost32/tasks-backend` y `dghost32/tasks-frontend` con las etiquetas `1.0.2`, `1.0.3` y `1.0.4` (una por build de Jenkins). El digest de `tasks-backend:1.0.3` (`sha256:cbdb3d0017c0…`) es el mismo que imprime la consola del build #3. En `1.0.4` el backend cambia (`sha256:64817101f131…`, Node.js 24) y el frontend conserva el mismo digest que en `1.0.3` (`sha256:8f70e86ce21a…`), porque su código no cambió: el build es reproducible.
 
 ![Etiquetas de tasks-backend en Docker Hub](capturas/06-dockerhub.png)
 

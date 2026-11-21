@@ -5,6 +5,7 @@
 node_modules/
 reportes/
 trivy-*.txt
+!docs/evidencias/trivy-*.txt
 trivy-*.sarif
 coverage/
 
