@@ -16,7 +16,7 @@ fi
 
 echo -n "==> Esperando a que SonarQube esté UP "
 for i in $(seq 1 60); do
-  STATUS=$(curl -s "${SONAR_URL}/api/system/status" | sed -n 's/.*"status":"\([A-Z_]*\)".*/\1/p')
+  STATUS=$(curl -s "${SONAR_URL}/api/system/status" | sed -n 's/.*"status":"\([A-Z_]*\)".*/\1/p' || true)
   [ "$STATUS" = "UP" ] && break
   echo -n "."; sleep 5
 done
