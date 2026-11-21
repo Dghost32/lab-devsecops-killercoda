@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: pruebas
     env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKE }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - uses: actions/checkout@v4
@@ -46,11 +46,11 @@ jobs:
 
       # Se omite si el repositorio no tiene los secretos SONAR_TOKEN / SONAR_HOST_URL
       - name: SonarQube Scan
-        if: env.SONAR_TOKE != ''
+        if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@v4
 
       - name: Aviso si no hay SonarQube configurado
-        if: env.SONAR_TOKE == ''
+        if: env.SONAR_TOKEN == ''
         run: echo "::notice::Configura los secretos SONAR_TOKEN y SONAR_HOST_URL para activar el análisis"
 
   seguridad:
