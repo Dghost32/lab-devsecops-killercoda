@@ -1,0 +1,37 @@
+# Configuración como código de Jenkins (plugin configuration-as-code).
+# La contraseña del admin se lee de la variable de entorno JENKINS_ADMIN_PASSWORD: no se versiona.
+jenkins:
+  systemMessage: "Laboratorio CI/CD — Fundamentos de DevOps (U. de La Sabana)"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://localhost:8081/"
+
+# Job de tipo Pipeline que lee el Jenkinsfile directamente del repositorio en GitHub.
+jobs:
+  - script: >
+      pipelineJob('tasks-app-cd') {
+        description('CD del laboratorio: clonar, pruebas, build, Trivy y publicación en Docker Hub')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('https://github.com/Dghost32/lab-devsecops-killercoda.git') }
+                branch('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }
